@@ -21,6 +21,13 @@ class Wheel:
     def __repr__(self) -> str:
         return str(self.wheel)
 
+
+def print_usage() -> None:
+        print("Usage:", file=sys.stderr)
+        print("\tmain <subcommand> <message> [setting]", file=sys.stderr)
+        print("\tsubcommands: enc | dec", file=sys.stderr)
+        print("\tsetting: a series of 3 letters", file=sys.stderr)
+
 def decode(letter: str, wheels: list[Wheel], mech: Generator) -> str:
     letters: Final[list[str]] = [chr(x+65) for x in range(WSIZE-1)]
     letters.append(' ')
@@ -57,39 +64,60 @@ def tick(wheels: list[Wheel]) -> Generator:
         w1.rotate()
         if w1.pos == 0:
             w2.rotate()
-            # if w2.pos == 0:
-            #     w3.rotate()
+            if w2.pos == 0:
+                w3.rotate()
         yield None
 
-def print_usage() -> None:
-        print("Usage:", file=sys.stderr)
-        print("\tmain <subcommand> <message>", file=sys.stderr)
-        print("\tsubcommands: enc | dec", file=sys.stderr)
+def parse_setting(setting: str) -> list[int]:
+    set_list: list[int] = []
+    for l in setting:
+        if l == ' ':
+            set_list.append(26)
+        else:
+            code = ord(l) - 65
+            if not ((code < 0) or (code > 26)):
+                set_list.append(code)
+            else:
+                print_usage()
+                exit(1)
+    return set_list
 
 def main() -> None:
     wheels: list[Wheel] = [Wheel() for _ in range(4)]
     mech: Generator = tick(wheels)
 
-    if (len(sys.argv) != 3):
-        print("error: not enough, or to many arguments provided", file=sys.stderr)
+    # TODO: clean repetitive/messy code in main
+    if (len(sys.argv) < 3):
+        print("error: not enough arguments provided", file=sys.stderr)
+        print_usage()
+        exit(1)
+    if (len(sys.argv) > 4):
+        print("error: to many arguments provided", file=sys.stderr)
         print_usage()
         exit(1)
 
+    if (len(sys.argv) == 4):
+        _, subcmd, msg, setting = sys.argv
+        assert len(setting) == 3
+        for w, v in zip(wheels, parse_setting(setting)):
+            w.rotate(v)
+            
+    elif (len(sys.argv) == 3):
+        _, subcmd, msg  = sys.argv
+        
+    if subcmd == "enc":
+        command = encode
+    elif subcmd == "dec":
+        command = decode
     else:
-        _, subcmd, msg = sys.argv
-        if subcmd == "enc":
-            command = encode
-        elif subcmd == "dec":
-            command = decode
-        else:
-            print(f"error: invalid subcommand {subcmd}", file=sys.stderr)
-            print_usage()
-            exit(1)
+        print(f"error: invalid subcommand {subcmd}", file=sys.stderr)
+        print_usage()
+        exit(1)
 
-        new_msg: list[str] = []
-        for l in msg:
-            new_msg.append(command(l, wheels, mech))
-        print("".join(new_msg))
+    new_msg: list[str] = []
+    for l in msg:
+        new_msg.append(command(l, wheels, mech))
+    print("".join(new_msg))
 
     
 
