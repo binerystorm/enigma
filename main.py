@@ -21,38 +21,33 @@ class Wheel:
     def __repr__(self) -> str:
         return str(self.wheel)
 
-def decode(msg: str, wheels: list[Wheel]) -> None:
+def decode(letter: str, wheels: list[Wheel], mech: Generator) -> str:
     letters: Final[list[str]] = [chr(x+65) for x in range(WSIZE-1)]
     letters.append(' ')
-    t = tick(wheels)
-    for l in msg:
-        next(t)
-        idx = letters.index(l)
-        for w in wheels:
-            idx = w.wheel.index(idx)
+    next(mech)
+    idx = letters.index(letter)
+    for w in wheels:
+        idx = w.wheel.index(idx)
 
-        for w in wheels[-2::-1]:
-            idx = w.wheel.index(idx)
+    for w in wheels[-2::-1]:
+        idx = w.wheel.index(idx)
 
-        print(letters[idx], end="")
-    print("")
+    return letters[idx]
 
 
-def encode(msg: str, wheels: list[Wheel]) -> None:
+def encode(letter: str, wheels: list[Wheel], mech: Generator) -> str:
     letters: Final[list[str]] = [chr(x+65) for x in range(WSIZE-1)]
     letters.append(' ')
-    t = tick(wheels)
-    for l in msg:
-        next(t)
-        idx = letters.index(l)
-        for w in wheels:
-            idx = w.wheel[idx]
+    next(mech)
+    idx = letters.index(letter)
+    for w in wheels:
+        idx = w.wheel[idx]
 
-        for w in wheels[-2::-1]:
-            idx = w.wheel[idx]
+    for w in wheels[-2::-1]:
+        idx = w.wheel[idx]
 
-        print(letters[idx], end="")
-    print("")
+    return letters[idx]
+
 
 def tick(wheels: list[Wheel]) -> Generator:
     global WSIZE
@@ -73,6 +68,7 @@ def print_usage() -> None:
 
 def main() -> None:
     wheels: list[Wheel] = [Wheel() for _ in range(4)]
+    mech: Generator = tick(wheels)
 
     if (len(sys.argv) != 3):
         print("error: not enough, or to many arguments provided", file=sys.stderr)
@@ -82,12 +78,18 @@ def main() -> None:
     else:
         _, subcmd, msg = sys.argv
         if subcmd == "enc":
-            encode(msg, wheels)
+            command = encode
         elif subcmd == "dec":
-            decode(msg, wheels)
+            command = decode
         else:
             print(f"error: invalid subcommand {subcmd}", file=sys.stderr)
             print_usage()
+            exit(1)
+
+        new_msg: list[str] = []
+        for l in msg:
+            new_msg.append(command(l, wheels, mech))
+        print("".join(new_msg))
 
     
 
