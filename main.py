@@ -2,7 +2,7 @@ from typing import Optional, Final, Generator
 import random as r
 import sys
 
-WSIZE: Final[int] = 27
+WSIZE: Final[int] = 26
 
 r.seed(69)
 
@@ -29,9 +29,11 @@ def print_usage() -> None:
         print("\tsetting: a series of 3 letters", file=sys.stderr)
 
 def decode(letter: str, wheels: list[Wheel], mech: Generator) -> str:
-    letters: Final[list[str]] = [chr(x+65) for x in range(WSIZE-1)]
-    letters.append(' ')
+    letters: Final[list[str]] = [chr(x+65) for x in range(WSIZE)]
     next(mech)
+    if letter == ' ':
+        return ' '
+
     idx = letters.index(letter)
     for w in wheels:
         idx = w.wheel.index(idx)
@@ -43,9 +45,11 @@ def decode(letter: str, wheels: list[Wheel], mech: Generator) -> str:
 
 
 def encode(letter: str, wheels: list[Wheel], mech: Generator) -> str:
-    letters: Final[list[str]] = [chr(x+65) for x in range(WSIZE-1)]
-    letters.append(' ')
+    letters: Final[list[str]] = [chr(x+65) for x in range(WSIZE)]
     next(mech)
+    if letter == ' ':
+        return ' '
+
     idx = letters.index(letter)
     for w in wheels:
         idx = w.wheel[idx]
@@ -71,15 +75,13 @@ def tick(wheels: list[Wheel]) -> Generator:
 def parse_setting(setting: str) -> list[int]:
     set_list: list[int] = []
     for l in setting:
-        if l == ' ':
-            set_list.append(26)
+        code = ord(l) - 65
+        if not ((code < 0) or (code > 26)):
+            set_list.append(code)
         else:
-            code = ord(l) - 65
-            if not ((code < 0) or (code > 26)):
-                set_list.append(code)
-            else:
-                print_usage()
-                exit(1)
+            print("error: only capital letters accepted in setting")
+            print_usage()
+            exit(1)
     return set_list
 
 def main() -> None:
@@ -98,7 +100,10 @@ def main() -> None:
 
     if (len(sys.argv) == 4):
         _, subcmd, msg, setting = sys.argv
-        assert len(setting) == 3
+        if len(setting) != 3:
+            print("error: setting must be exactly 3 charecters long")
+            print_usage()
+            exit(1)
         for w, v in zip(wheels, parse_setting(setting)):
             w.rotate(v)
             
@@ -122,4 +127,3 @@ def main() -> None:
     
 
 main()
-    
