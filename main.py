@@ -1,15 +1,27 @@
-from typing import Optional, Final, Generator
+from typing import Optional, Final, Generator, NamedTuple, Union
 import random as r
 import sys
 
-Wiring = list[tuple[int, int]]
 
-WSIZE  : Final[int] = 4
+WSIZE  : Final[int] = 26
 WAMOUNT: Final[int] = 3
 RSIZE  : Final[int] = WSIZE
 RAMOUNT: Final[int] = 1
 
+assert WSIZE % 2 == 0, "Reflector will not work with uneven wheels size"
+
 r.seed(69)
+
+class Con(NamedTuple):
+    fro: int
+    to: int
+
+class Dcon(NamedTuple):
+    start: Con
+    end: Con
+
+Wiring = list[Con]
+Reflec = list[int]
 
 class Wheel:
     global WSIZE
@@ -19,13 +31,11 @@ class Wheel:
         self.pos = 0
 
     def rotate(self, amount: int = 1) -> None:
-        self.pos = (self.pos + 1) % WSIZE
+        self.pos = (self.pos + amount) % WSIZE
         for i, v in enumerate(self.wiring):
-            assert len(self.wiring[i]) == 2, "Wiring must be of length 2"
-            v2, v1 = v
-            w1 = (v1 + amount) % WSIZE
-            w2 = (v2 + amount) % WSIZE
-            self.wiring[i] = (w1, w2,) 
+            wi1 = (v.to + amount) % WSIZE
+            wi2 = (v.fro + amount) % WSIZE
+            self.wiring[i] = Con(wi1, wi2) 
 
     def __repr__(self) -> str:
         return str(self.wiring)
@@ -36,20 +46,28 @@ def print_usage() -> None:
         print("\tsubcommands: enc | dec", file=sys.stderr)
         print("\tsetting: a series of 3 letters", file=sys.stderr)
 
-def gen_wheels() -> tuple[Wheel, ...]:
+def gen_wheels() -> tuple[list[Wheel], Reflec]:
     global WSIZE, WAMOUNT
     wheels: list[Wheel] = []
+    reflector: Reflec = [0 for _ in range(WSIZE)]
     
     to = [r.sample([x for x in range(WSIZE)], WSIZE) for _ in range(WAMOUNT)]
     prev = list(range(WSIZE))
     
     for nxt in to:
-        wheels.append(Wheel([(v, nxt[v]) for v in prev]))
+        wheels.append(Wheel([Con(prev.index(i), v) for i,v in enumerate(nxt)]))
         prev = nxt
 
-    return tuple(wheels)
+    possible_vals: list[int] = r.sample(range(WSIZE), WSIZE)
+    for i in range(len(possible_vals) // 2):
+        v1 = possible_vals.pop()
+        v2 = possible_vals.pop()
+        reflector[v1] = v2
+        reflector[v2] = v1
 
-def decode(letter: str, wheels: list[Wheel], mech: Generator) -> str:
+    return wheels, reflector
+
+def decode(letter: str, wheels: list[Wheel], reflec: Reflec, mech: Generator) -> str:
     letters: Final[list[str]] = [chr(x+65) for x in range(WSIZE)]
     next(mech)
     if letter == ' ':
@@ -57,15 +75,17 @@ def decode(letter: str, wheels: list[Wheel], mech: Generator) -> str:
 
     idx = letters.index(letter)
     for w in wheels:
-        idx = w.wiring.index(idx)
+        idx = w.wiring[idx].fro
 
-    for w in wheels[-2::-1]:
-        idx = w.wiring.index(idx)
+    idx = reflec[idx]
+
+    for w in reversed(wheels):
+        idx = w.wiring[idx].fro
 
     return letters[idx]
 
 
-def encode(letter: str, wheels: list[Wheel], mech: Generator) -> str:
+def encode(letter: str, wheels: list[Wheel], reflec: Reflec, mech: Generator) -> str:
     letters: Final[list[str]] = [chr(x+65) for x in range(WSIZE)]
     next(mech)
     if letter == ' ':
@@ -73,10 +93,12 @@ def encode(letter: str, wheels: list[Wheel], mech: Generator) -> str:
 
     idx = letters.index(letter)
     for w in wheels:
-        idx = w.wiring[idx]
+        idx = w.wiring[idx].to
 
-    for w in wheels[-2::-1]:
-        idx = w.wiring[idx]
+    idx = reflec[idx]
+
+    for w in reversed(wheels):
+        idx = w.wiring[idx].to
 
     return letters[idx]
 
@@ -85,7 +107,7 @@ def tick(wheels: list[Wheel]) -> Generator:
     global WSIZE, WAMOUNT
     # NOTE: this must assert `3` as the tick function is still not dynamic
     assert len(wheels) == 3
-    w1, w2, w3, _ = wheels
+    w1, w2, w3 = wheels
     while(True):
         w1.rotate()
         # TODO: make more dynamic (accounting for more or less wheels)
@@ -109,14 +131,10 @@ def parse_setting(setting: str) -> list[int]:
             exit(1)
     return set_list
 
+
 def main() -> None:
-    for i in gen_wheels():
-        print(i)
-
-
-def main1() -> None:
     global WAMOUNT
-    wheels: list[Wheel] = [Wheel() for _ in range(4)]
+    wheels, reflector = gen_wheels()
     mech: Generator = tick(wheels)
 
     # TODO: clean repetitive/messy code in main
@@ -152,9 +170,7 @@ def main1() -> None:
 
     new_msg: list[str] = []
     for l in msg:
-        new_msg.append(command(l, wheels, mech))
+        new_msg.append(command(l, wheels, reflector, mech))
     print("".join(new_msg))
-
-    
 
 main()
